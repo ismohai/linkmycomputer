@@ -1,3 +1,5 @@
+import java.io.File
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -16,7 +18,7 @@ android {
                 keyAlias = System.getenv("ANDROID_SIGNING_KEY_ALIAS")
                 keyPassword = System.getenv("ANDROID_SIGNING_KEY_PASSWORD")
             } else {
-                val debugStore = java.io.File(System.getProperty("user.home"), ".android/debug.keystore")
+                val debugStore = File(System.getProperty("user.home"), ".android/debug.keystore")
                 if (debugStore.exists()) {
                     storeFile = debugStore
                     storePassword = "android"
