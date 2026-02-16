@@ -24,8 +24,26 @@ jobs:
       - name: 运行安卓单元测试
         run: gradle -p app test
 
+      - name: 生成CI签名密钥
+        run: |
+          mkdir -p "$RUNNER_TEMP/android-signing"
+          keytool -genkeypair -v \
+            -keystore "$RUNNER_TEMP/android-signing/release.keystore" \
+            -storepass android \
+            -keypass android \
+            -alias linkmycomputer \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -dname "CN=LinkMyComputer, OU=CI, O=LinkMyComputer, L=Remote, ST=Remote, C=CN"
+
       - name: 构建发布版 APK
         run: gradle -p app :app:assembleRelease
+        env:
+          ANDROID_SIGNING_STORE_FILE: ${{ runner.temp }}/android-signing/release.keystore
+          ANDROID_SIGNING_STORE_PASSWORD: android
+          ANDROID_SIGNING_KEY_ALIAS: linkmycomputer
+          ANDROID_SIGNING_KEY_PASSWORD: android
 
       - name: 上传 APK 产物
         uses: actions/upload-artifact@v4

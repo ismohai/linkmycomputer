@@ -16,7 +16,13 @@ android {
                 keyAlias = System.getenv("ANDROID_SIGNING_KEY_ALIAS")
                 keyPassword = System.getenv("ANDROID_SIGNING_KEY_PASSWORD")
             } else {
-                initWith(getByName("debug"))
+                val debugStore = java.io.File(System.getProperty("user.home"), ".android/debug.keystore")
+                if (debugStore.exists()) {
+                    storeFile = debugStore
+                    storePassword = "android"
+                    keyAlias = "androiddebugkey"
+                    keyPassword = "android"
+                }
             }
         }
     }
