@@ -8,6 +8,7 @@ import java.net.InetSocketAddress
 import java.net.SocketException
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.concurrent.thread
 
 data class ConnectRequest(
     val desktopName: String,
@@ -186,21 +187,29 @@ class LanControlServer(
 
                 onConnectRequest(request) { accepted ->
                     if (accepted) {
-                        connectedEndpoint = InetSocketAddress(address, port)
-                        connectedTouchEndpoint = InetSocketAddress(address, hostTouchPort)
-                        connectedDesktopName = desktopName
-                        sendPacket("LMC_CONNECT_ACCEPT|${Build.MODEL}", address, port)
-                        onConnectionChanged(
-                            LanConnectionState(
-                                connected = true,
-                                desktopName = desktopName,
-                                hostAddress = address.hostAddress
-                            )
-                        )
-                        onStatus("已连接电脑：$desktopName")
+                        thread(name = "LanConnectAcceptReply") {
+                            val sent = sendPacket("LMC_CONNECT_ACCEPT|${Build.MODEL}", address, port)
+                            if (sent) {
+                                connectedEndpoint = InetSocketAddress(address, port)
+                                connectedTouchEndpoint = InetSocketAddress(address, hostTouchPort)
+                                connectedDesktopName = desktopName
+                                onConnectionChanged(
+                                    LanConnectionState(
+                                        connected = true,
+                                        desktopName = desktopName,
+                                        hostAddress = address.hostAddress
+                                    )
+                                )
+                                onStatus("已连接电脑：$desktopName")
+                            } else {
+                                onStatus("连接确认发送失败，请在电脑端重试连接。")
+                            }
+                        }
                     } else {
-                        sendPacket("LMC_CONNECT_REJECT|PHONE_REJECT", address, port)
-                        onStatus("已拒绝来自 $desktopName 的连接请求。")
+                        thread(name = "LanConnectRejectReply") {
+                            sendPacket("LMC_CONNECT_REJECT|PHONE_REJECT", address, port)
+                            onStatus("已拒绝来自 $desktopName 的连接请求。")
+                        }
                     }
                 }
             }
@@ -224,14 +233,17 @@ class LanControlServer(
         sendPacket(message, endpoint.address, endpoint.port)
     }
 
-    private fun sendPacket(message: String, address: InetAddress, port: Int) {
-        try {
+    private fun sendPacket(message: String, address: InetAddress, port: Int): Boolean {
+        return try {
             DatagramSocket().use { socket ->
                 val payload = message.toByteArray(Charsets.UTF_8)
                 val packet = DatagramPacket(payload, payload.size, address, port)
                 socket.send(packet)
             }
-        } catch (_: Exception) {
+            true
+        } catch (err: Exception) {
+            onStatus("发送网络包失败：${err.message}")
+            false
         }
     }
 
