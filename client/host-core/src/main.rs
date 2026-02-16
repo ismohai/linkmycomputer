@@ -8,7 +8,7 @@ fn main() {
     let profile = match read_profile_from_args() {
         Ok(profile) => profile,
         Err(err) => {
-            eprintln!("invalid profile: {err}");
+            eprintln!("配置无效: {err}");
             std::process::exit(2);
         }
     };
@@ -24,7 +24,7 @@ fn main() {
     match session.start(profile, capability) {
         Ok(started) => {
             println!(
-                "session started: {}x{}@{} codec={:?} bitrate={}kbps",
+                "会话已启动：{}x{}@{} 编码={:?} 码率={}kbps",
                 started.pipeline.capture.width,
                 started.pipeline.capture.height,
                 started.pipeline.capture.fps,
@@ -33,7 +33,7 @@ fn main() {
             );
         }
         Err(err) => {
-            eprintln!("failed to start session: {err}");
+            eprintln!("会话启动失败: {err}");
             std::process::exit(3);
         }
     }
@@ -56,7 +56,7 @@ fn read_profile_from_args() -> Result<RuntimeProfile, String> {
             }
             "--resolution" => {
                 i += 1;
-                let value = args.get(i).ok_or("missing value for --resolution")?;
+                let value = args.get(i).ok_or("--resolution 缺少参数")?;
                 let (w, h) = parse_resolution(value)?;
                 width = w;
                 height = h;
@@ -67,10 +67,10 @@ fn read_profile_from_args() -> Result<RuntimeProfile, String> {
             }
             "--codec" => {
                 i += 1;
-                codec = parse_codec(args.get(i).ok_or("missing value for --codec")?)?;
+                codec = parse_codec(args.get(i).ok_or("--codec 缺少参数")?)?;
             }
             other => {
-                return Err(format!("unknown argument: {other}"));
+                return Err(format!("未知参数: {other}"));
             }
         }
         i += 1;
@@ -82,29 +82,27 @@ fn read_profile_from_args() -> Result<RuntimeProfile, String> {
 
 fn parse_u16(value: Option<&String>, key: &str) -> Result<u16, String> {
     value
-        .ok_or_else(|| format!("missing value for {key}"))?
+        .ok_or_else(|| format!("{key} 缺少参数"))?
         .parse::<u16>()
-        .map_err(|err| format!("invalid {key} value: {err}"))
+        .map_err(|err| format!("{key} 参数无效: {err}"))
 }
 
 fn parse_u32(value: Option<&String>, key: &str) -> Result<u32, String> {
     value
-        .ok_or_else(|| format!("missing value for {key}"))?
+        .ok_or_else(|| format!("{key} 缺少参数"))?
         .parse::<u32>()
-        .map_err(|err| format!("invalid {key} value: {err}"))
+        .map_err(|err| format!("{key} 参数无效: {err}"))
 }
 
 fn parse_resolution(value: &str) -> Result<(u16, u16), String> {
-    let (w, h) = value
-        .split_once('x')
-        .ok_or("resolution must be WIDTHxHEIGHT")?;
+    let (w, h) = value.split_once('x').ok_or("分辨率格式必须为 宽x高")?;
 
     let width = w
         .parse::<u16>()
-        .map_err(|err| format!("invalid resolution width: {err}"))?;
+        .map_err(|err| format!("分辨率宽度无效: {err}"))?;
     let height = h
         .parse::<u16>()
-        .map_err(|err| format!("invalid resolution height: {err}"))?;
+        .map_err(|err| format!("分辨率高度无效: {err}"))?;
 
     Ok((width, height))
 }
@@ -113,6 +111,6 @@ fn parse_codec(value: &str) -> Result<Codec, String> {
     match value {
         "h264" => Ok(Codec::H264),
         "hevc" => Ok(Codec::Hevc),
-        _ => Err("codec must be h264 or hevc".to_string()),
+        _ => Err("编码格式必须是 h264 或 hevc".to_string()),
     }
 }

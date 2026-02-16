@@ -7,7 +7,7 @@ import "./styles.css";
 
 function HostConsoleApp() {
   const [status, setStatus] = useState<UiSessionStatus>("idle");
-  const [lastMessage, setLastMessage] = useState<string>("Ready to launch session.");
+  const [lastMessage, setLastMessage] = useState<string>("准备就绪，可随时启动会话。");
 
   useEffect(() => {
     void refreshStatus();
@@ -26,10 +26,10 @@ function HostConsoleApp() {
   const handleStart = async (payload: SessionPayload) => {
     try {
       setStatus("starting");
-      setLastMessage(`Starting ${payload.resolution}@${payload.fps}Hz profile...`);
+      setLastMessage(`正在启动 ${payload.resolution}@${payload.fps}Hz 配置...`);
       await startLockedSession(payload);
       setStatus("running");
-      setLastMessage(`Running ${payload.resolution}@${payload.fps}Hz in Turbo Lock.`);
+      setLastMessage(`已运行：${payload.resolution}@${payload.fps}Hz（极速锁定）`);
     } catch (error) {
       setStatus("error");
       setLastMessage(formatError(error));
@@ -40,7 +40,7 @@ function HostConsoleApp() {
     try {
       await stopSession();
       setStatus("idle");
-      setLastMessage("Session stopped.");
+      setLastMessage("会话已停止。");
     } catch (error) {
       setStatus("error");
       setLastMessage(formatError(error));
@@ -68,7 +68,7 @@ function formatError(error: unknown): string {
   if (error && typeof error === "object" && "message" in error) {
     return String((error as { message: string }).message);
   }
-  return "Unexpected error while controlling session.";
+  return "控制会话时发生未知错误。";
 }
 
 const root = document.getElementById("root");

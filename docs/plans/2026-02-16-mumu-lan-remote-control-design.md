@@ -1,97 +1,82 @@
-# MuMu LAN Remote Control Design
+# MuMu 局域网远控设计方案
 
-## Goal
+## 目标
 
-Build a low-latency LAN remote control system so a phone can view and control MuMu on Windows with true multi-touch for game play.
+实现一套局域网低延迟远控系统，让手机可以直接观看并操控 Windows 上的 MuMu 模拟器，支持真实多点触控。
 
-## Why This Exists
+## 背景
 
-The user plays mobile games in a desktop emulator and needs phone-native touch control because desktop keyboard and mouse mapping is hard to use. Existing remote tools introduce too much latency.
+用户在电脑模拟器上玩手游时，键鼠映射上手成本高，常见远控工具延迟偏大，无法满足高频操作场景。
 
-## Scope
+## 范围
 
-- Phone shows emulator video in real time.
-- Phone sends multi-touch gestures to emulator.
-- LAN only mode for lowest latency.
-- Performance profiles include 60, 90, 120, and 144 FPS.
-- Resolution profiles include multiple levels up to 2460x1080.
+- 手机端实时显示模拟器画面。
+- 手机端发送多点触控事件到主机。
+- 仅支持局域网连接，优先低延迟。
+- 帧率档位支持 `60/90/120/144`。
+- 分辨率档位支持到 `2460x1080`。
 
-## Non-Goals
+## 非目标
 
-- Internet relay or WAN access.
-- iOS client in first release.
-- Generic emulator support in first release (MuMu first).
+- 首版不做公网中继。
+- 首版不做 iOS 客户端。
+- 首版不做全模拟器通用适配（以 MuMu 优先）。
 
-## System Architecture
+## 系统架构
 
-### Host (Windows)
+### 桌面主机端（Windows）
 
-- Rust `host-core` for capture, encoding, transport, touch injection, and session orchestration.
-- Optional Tauri + React UI (`host-ui`) for setup, profile selection, pairing, and diagnostics.
+- `client/host-core`：负责采集、编码、传输、触控注入、会话编排。
+- `client`（Tauri + React）：负责参数配置、状态显示、启动/停止控制。
 
-### Mobile (Android)
+### 手机端（Android）
 
-- Native Kotlin app for video rendering, touch capture, and session control.
-- Full multi-pointer tracking (pointer id lifecycle preserved).
+- Kotlin 原生实现触控采集与后续视频渲染链路。
+- 维持完整 pointer 生命周期，保障多指一致性。
 
-### Transport
+### 传输层
 
-- WebRTC for video and control channels over LAN.
-- Video on media stream.
-- Control on DataChannel with low-latency semantics.
+- 使用 WebRTC 承载视频与控制通道。
+- 视频走媒体流，触控指令走 DataChannel。
 
-## MuMu Input Strategy
+## MuMu 输入方案
 
-- Primary path uses ADB + minitouch pipeline.
-- Host discovers MuMu-targetable Android instance and forwards touch commands.
-- Touch protocol carries pointer id, action, normalized coordinates, pressure, and timestamp.
+- 主路径采用 `ADB + minitouch`。
+- 主机发现可用 MuMu 设备并转发触控指令。
+- 协议携带 pointerId、动作、归一化坐标、压力值、时间戳。
 
-## Lock-Performance Policy
+## 性能策略
 
-- Default mode: `Turbo Lock`.
-- Session runs at selected FPS and resolution without adaptive downgrade.
-- Pre-flight capability checks decide whether selected profile can start.
-- If profile exceeds hardware/network capability, startup fails with clear fallback suggestions.
+- 默认策略为 `Turbo Lock`（固定档位运行，不自动降档）。
+- 启动前先做能力校验，不满足条件直接提示并拒绝启动。
+- 不支持的档位返回可用候选档位。
 
-## Profiles
+## 关键数据流
 
-- FPS: 60 / 90 / 120 / 144.
-- Resolution presets include 1280x720, 1600x900, 1920x1080, 2460x1080.
-- Codec preference: HEVC first for high profiles; H264 fallback when unsupported.
+1. 主机采集 MuMu 窗口帧。
+2. 按配置档位进行编码。
+3. 通过 WebRTC 下发视频流。
+4. 手机端解码并显示。
+5. 手机触控层上报多点事件。
+6. 主机接收事件并转为 minitouch 指令注入 MuMu。
 
-## Critical Data Flow
+## 异常处理
 
-1. Host captures MuMu window frames.
-2. Host encodes frame by selected profile.
-3. Host sends encoded stream via WebRTC.
-4. Android decodes and renders immediately.
-5. Android touch layer emits normalized multi-touch events.
-6. Host receives control packets and injects touches to MuMu via minitouch.
+- 设备发现失败：给出明确排查提示。
+- ADB 断链：自动重试并在 UI 提示。
+- 档位不可用：阻止启动并提示可用档位。
+- 控制通道中断：冻结触控并尝试重连。
 
-## Error Handling
+## 验证目标
 
-- Device discovery failure: show explicit remediation steps.
-- ADB disconnect: auto-retry and notify in UI.
-- Unsupported profile: block start and show closest supported presets.
-- Control channel loss: freeze touch input and attempt reconnect.
+- 手势正确性：双指缩放、三指点击、拖拽、长按。
+- 稳定性：持续 15 分钟不掉线。
+- 性能：通过能力校验后，帧率稳定在选定档位。
+- 延迟观测：采集到显示、触控到注入全链路可观测。
 
-## Security and LAN Boundaries
+## 交付阶段
 
-- LAN-only discovery with mDNS.
-- One-time pairing token via QR.
-- Device whitelist after first successful pairing.
-- No default external exposure.
-
-## Verification Targets
-
-- Touch correctness: two-finger zoom, three-finger tap, drag, long press.
-- Stability: 15-minute continuous session without disconnect.
-- Performance: stable frame pacing at selected profile when capability check passes.
-- Latency telemetry: capture-to-render and touch-to-inject timings recorded.
-
-## Delivery Phases
-
-- P0: End-to-end PoC with single touch.
-- P1: Multi-touch and profile switching.
-- P2: 120/144 high profile hardening and diagnostics.
-- P3: CI packaging for Windows installer and Android APK.
+- P0：端到端 PoC（单指）。
+- P1：多点触控 + 档位切换。
+- P2：120/144 高频档稳定性优化。
+- P3：GitHub Actions 自动打包桌面端与安卓端。

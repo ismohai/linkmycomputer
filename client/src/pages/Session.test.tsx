@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { SessionPage } from "./Session";
 
 describe("SessionPage", () => {
-  it("serializes Turbo Lock profile payload", () => {
+  it("可以正确提交极速锁定配置", () => {
     const onStart = vi.fn();
     const onStop = vi.fn();
     render(
@@ -15,12 +15,12 @@ describe("SessionPage", () => {
       />
     );
 
-    fireEvent.change(screen.getByLabelText(/fps/i), { target: { value: "144" } });
-    fireEvent.change(screen.getByLabelText(/resolution/i), {
+    fireEvent.change(screen.getByLabelText(/帧率/i), { target: { value: "144" } });
+    fireEvent.change(screen.getByLabelText(/分辨率/i), {
       target: { value: "2460x1080" }
     });
-    fireEvent.change(screen.getByLabelText(/bitrate/i), { target: { value: "80000" } });
-    fireEvent.click(screen.getByRole("button", { name: /start locked session/i }));
+    fireEvent.change(screen.getByLabelText(/码率/i), { target: { value: "80000" } });
+    fireEvent.click(screen.getByRole("button", { name: /启动锁定会话/i }));
 
     expect(onStart).toHaveBeenCalledWith({
       fps: 144,
@@ -30,7 +30,7 @@ describe("SessionPage", () => {
     });
   });
 
-  it("disables stop button when not running", () => {
+  it("仅在运行中允许停止会话", () => {
     const onStart = vi.fn();
     const onStop = vi.fn();
 
@@ -42,7 +42,7 @@ describe("SessionPage", () => {
       />
     );
 
-    expect(screen.getByRole("button", { name: /stop session/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /停止会话/i })).toBeDisabled();
 
     rerender(
       <SessionPage
@@ -52,6 +52,6 @@ describe("SessionPage", () => {
       />
     );
 
-    expect(screen.getByRole("button", { name: /stop session/i })).toBeEnabled();
+    expect(screen.getByRole("button", { name: /停止会话/i })).toBeEnabled();
   });
 });

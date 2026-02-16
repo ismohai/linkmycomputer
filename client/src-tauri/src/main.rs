@@ -38,7 +38,7 @@ fn start_locked_session(
     state: tauri::State<HostState>,
 ) -> Result<SessionPayload, String> {
     if payload.lock_policy != "turbo_lock" {
-        return Err("lock policy must be turbo_lock".to_string());
+        return Err("锁定策略必须为 turbo_lock".to_string());
     }
 
     let (width, height) = parse_resolution(&payload.resolution)?;
@@ -62,7 +62,7 @@ fn start_locked_session(
     let mut manager = state
         .session
         .lock()
-        .map_err(|_| "failed to lock session manager".to_string())?;
+        .map_err(|_| "会话管理器加锁失败".to_string())?;
     manager
         .start(profile, capability)
         .map_err(|err| err.to_string())?;
@@ -75,7 +75,7 @@ fn stop_session(state: tauri::State<HostState>) -> Result<(), String> {
     let mut manager = state
         .session
         .lock()
-        .map_err(|_| "failed to lock session manager".to_string())?;
+        .map_err(|_| "会话管理器加锁失败".to_string())?;
     manager.stop();
     Ok(())
 }
@@ -85,7 +85,7 @@ fn session_status(state: tauri::State<HostState>) -> Result<SessionStatusPayload
     let manager = state
         .session
         .lock()
-        .map_err(|_| "failed to lock session manager".to_string())?;
+        .map_err(|_| "会话管理器加锁失败".to_string())?;
 
     let value = match manager.state() {
         SessionState::Idle => SessionStateValue::Idle,
@@ -97,15 +97,9 @@ fn session_status(state: tauri::State<HostState>) -> Result<SessionStatusPayload
 }
 
 fn parse_resolution(value: &str) -> Result<(u16, u16), String> {
-    let (w, h) = value
-        .split_once('x')
-        .ok_or("resolution must be WIDTHxHEIGHT")?;
-    let width = w
-        .parse::<u16>()
-        .map_err(|err| format!("invalid width: {err}"))?;
-    let height = h
-        .parse::<u16>()
-        .map_err(|err| format!("invalid height: {err}"))?;
+    let (w, h) = value.split_once('x').ok_or("分辨率格式必须为 宽x高")?;
+    let width = w.parse::<u16>().map_err(|err| format!("宽度无效: {err}"))?;
+    let height = h.parse::<u16>().map_err(|err| format!("高度无效: {err}"))?;
     Ok((width, height))
 }
 
@@ -120,5 +114,5 @@ fn main() {
             session_status
         ])
         .run(tauri::generate_context!())
-        .expect("failed to run tauri application");
+        .expect("Tauri 应用启动失败");
 }

@@ -1,4 +1,4 @@
-name: release-host
+name: 桌面端打包
 
 on:
   workflow_dispatch:
@@ -9,48 +9,48 @@ jobs:
   build-windows-host:
     runs-on: windows-latest
     steps:
-      - name: Checkout
+      - name: 拉取代码
         uses: actions/checkout@v4
 
-      - name: Setup Rust
+      - name: 安装 Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Cache Cargo
+      - name: 缓存 Cargo
         uses: Swatinem/rust-cache@v2
 
-      - name: Run host-core tests
+      - name: 运行 host-core 测试
         run: cargo test -p host-core
 
-      - name: Build host-core release binary
+      - name: 构建 host-core 发布版
         run: cargo build -p host-core --release
 
-      - name: Setup Node
+      - name: 安装 Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
           cache-dependency-path: client/package-lock.json
 
-      - name: Install host-ui deps
+      - name: 安装客户端依赖
         working-directory: client
         run: npm ci
 
-      - name: Run host-ui tests
+      - name: 运行客户端测试
         working-directory: client
         run: npm test
 
-      - name: Build host-ui frontend
+      - name: 构建客户端前端
         working-directory: client
         run: npm run build
 
-      - name: Check tauri backend
+      - name: 检查 Tauri 后端
         working-directory: client/src-tauri
         run: cargo check
 
-      - name: Archive host artifacts
+      - name: 上传桌面端产物
         uses: actions/upload-artifact@v4
         with:
-          name: host-core-artifacts
+          name: 桌面端产物
           path: |
             target/release/host-core.exe
             client/dist

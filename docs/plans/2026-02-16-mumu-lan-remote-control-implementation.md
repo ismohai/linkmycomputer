@@ -1,260 +1,118 @@
-# MuMu LAN Remote Control Implementation Plan
+# MuMu 局域网远控实施计划
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
+> 执行要求：按任务拆分逐项实现、逐项验证。
 
-**Goal:** Deliver a production-ready LAN remote control system for MuMu with phone video + multi-touch control and lockable high refresh/resolution profiles.
-
-**Architecture:** Build a Rust host core for capture/encoding/transport/input injection and a Kotlin Android client for render/touch capture. Use WebRTC media/data channels and a MuMu-focused ADB + minitouch touch pipeline. Keep profile behavior locked by default with pre-flight checks.
-
-**Tech Stack:** Rust, Tokio, Serde, thiserror, Tauri + React, Kotlin, Android WebRTC, ADB/minitouch, GitHub Actions.
+**目标：** 交付可打包的 MuMu 局域网远控工程，覆盖桌面端控制台、主机核心、安卓端基础能力与 GitHub 自动打包。  
+**架构：** `client/host-core` 负责核心链路，`client` 负责 Tauri 桌面 UI，`app` 负责 Android 端触控与后续渲染能力。  
+**技术栈：** Rust、Tauri、React、Kotlin、Gradle、GitHub Actions。
 
 ---
 
-### Task 1: Workspace Scaffold and Config Profiles
-
-**Files:**
-- Create: `Cargo.toml`
-- Create: `apps/host-core/Cargo.toml`
-- Create: `apps/host-core/src/config/profile.rs`
-- Create: `apps/host-core/tests/profile_test.rs`
-
-**Step 1: Write the failing test**
-
-Add tests that fail for missing lock profile validation and fallback listing.
-
-**Step 2: Run test to verify it fails**
-
-Run: `cargo test -p host-core profile`  
-Expected: fail because profile module is missing.
-
-**Step 3: Write minimal implementation**
-
-Implement profile enums, lock policy, and validation helpers.
-
-**Step 4: Run test to verify it passes**
-
-Run: `cargo test -p host-core profile`  
-Expected: all profile tests pass.
-
-### Task 2: Control Protocol Model
-
-**Files:**
-- Create: `shared/proto/control.proto`
-- Create: `apps/host-core/src/protocol/control.rs`
-- Create: `apps/host-core/tests/protocol_test.rs`
-
-**Step 1: Write the failing test**
-
-Add serialization tests for pointer lifecycle and binary payload integrity.
-
-**Step 2: Run test to verify it fails**
-
-Run: `cargo test -p host-core protocol`  
-Expected: fail because protocol model does not exist.
-
-**Step 3: Write minimal implementation**
-
-Implement touch event model and serde codec.
-
-**Step 4: Run test to verify it passes**
-
-Run: `cargo test -p host-core protocol`  
-Expected: tests pass.
-
-### Task 3: MuMu Discovery and minitouch Encoder
-
-**Files:**
-- Create: `apps/host-core/src/input/mumu/adb.rs`
-- Create: `apps/host-core/src/input/mumu/minitouch.rs`
-- Create: `apps/host-core/tests/mumu_test.rs`
-
-**Step 1: Write the failing test**
-
-Add tests for ADB output parsing and minitouch command frame encoding.
-
-**Step 2: Run test to verify it fails**
-
-Run: `cargo test -p host-core mumu`  
-Expected: fail due missing discovery/encoder.
-
-**Step 3: Write minimal implementation**
-
-Implement deterministic parser and command builder for down/move/up/commit.
-
-**Step 4: Run test to verify it passes**
-
-Run: `cargo test -p host-core mumu`  
-Expected: tests pass.
-
-### Task 4: Coordinate Mapping Core
-
-**Files:**
-- Create: `apps/host-core/src/input/mapping.rs`
-- Create: `apps/host-core/tests/mapping_test.rs`
-
-**Step 1: Write the failing test**
-
-Add tests for letterbox clipping, scaling, and normalized-to-emulator transforms.
-
-**Step 2: Run test to verify it fails**
-
-Run: `cargo test -p host-core mapping`  
-Expected: fail due missing mapping module.
-
-**Step 3: Write minimal implementation**
-
-Implement viewport model and transform math.
-
-**Step 4: Run test to verify it passes**
-
-Run: `cargo test -p host-core mapping`  
-Expected: tests pass.
-
-### Task 5: Capture, Encode, and Transport Abstractions
-
-**Files:**
-- Create: `apps/host-core/src/capture/dxgi.rs`
-- Create: `apps/host-core/src/encode/nvenc.rs`
-- Create: `apps/host-core/src/transport/webrtc.rs`
-- Create: `apps/host-core/tests/pipeline_test.rs`
-
-**Step 1: Write the failing test**
-
-Add tests for capability checks and lock-profile pipeline selection.
-
-**Step 2: Run test to verify it fails**
-
-Run: `cargo test -p host-core pipeline`  
-Expected: fail because pipeline modules do not exist.
-
-**Step 3: Write minimal implementation**
-
-Implement capability negotiation, profile gating, and pipeline descriptors.
-
-**Step 4: Run test to verify it passes**
-
-Run: `cargo test -p host-core pipeline`  
-Expected: tests pass.
-
-### Task 6: Android Client Skeleton
-
-**Files:**
-- Create: `apps/android/app/src/main/java/com/linkmycomputer/player/PlayerActivity.kt`
-- Create: `apps/android/app/src/main/java/com/linkmycomputer/player/TouchOverlayView.kt`
-- Create: `apps/android/app/src/main/java/com/linkmycomputer/player/TouchTracker.kt`
-- Create: `apps/android/app/src/test/java/com/linkmycomputer/player/TouchTrackerTest.kt`
-
-**Step 1: Write the failing test**
-
-Add tests for pointer lifecycle and stable touch frame generation.
-
-**Step 2: Run test to verify it fails**
-
-Run: `./gradlew test`  
-Expected: fail before tracker implementation.
-
-**Step 3: Write minimal implementation**
-
-Implement touch tracker and UI overlay wiring.
-
-**Step 4: Run test to verify it passes**
-
-Run: `./gradlew test`  
-Expected: touch tracker tests pass.
-
-### Task 7: Host UI Skeleton
-
-**Files:**
-- Create: `apps/host-ui/src/pages/Session.tsx`
-- Create: `apps/host-ui/src/lib/api.ts`
-- Create: `apps/host-ui/src-tauri/src/main.rs`
-
-**Step 1: Write the failing test**
-
-Add test for profile form state and lock policy serialization.
-
-**Step 2: Run test to verify it fails**
-
-Run: `npm test --workspace apps/host-ui`  
-Expected: fail due missing component.
-
-**Step 3: Write minimal implementation**
-
-Implement profile panel and host command bridge.
-
-**Step 4: Run test to verify it passes**
-
-Run: `npm test --workspace apps/host-ui`  
-Expected: tests pass.
-
-### Task 8: CI/CD Workflows
-
-**Files:**
-- Create: `.github/workflows/release-host.yml`
-- Create: `.github/workflows/release-android.yml`
-
-**Step 1: Write the failing test**
-
-Add validation by running local workflow lint or dry run command.
-
-**Step 2: Run validation to verify it fails**
-
-Run: `actionlint`  
-Expected: fail before workflow files exist.
-
-**Step 3: Write minimal implementation**
-
-Implement release workflows for Windows host and Android APK.
-
-**Step 4: Run validation to verify it passes**
-
-Run: `actionlint`  
-Expected: no workflow lint errors.
-
-### Task 9: End-to-End Session Orchestration
-
-**Files:**
-- Create: `apps/host-core/src/session.rs`
-- Create: `apps/host-core/tests/session_test.rs`
-
-**Step 1: Write the failing test**
-
-Add tests for startup gating, profile lock enforcement, and session state transitions.
-
-**Step 2: Run test to verify it fails**
-
-Run: `cargo test -p host-core session`  
-Expected: fail because session orchestrator is missing.
-
-**Step 3: Write minimal implementation**
-
-Implement session orchestrator and status machine.
-
-**Step 4: Run test to verify it passes**
-
-Run: `cargo test -p host-core session`  
-Expected: tests pass.
-
-### Task 10: Full Verification and Packaging Readiness
-
-**Files:**
-- Modify: `README.md`
-- Modify: `docs/plans/2026-02-16-mumu-lan-remote-control-design.md`
-
-**Step 1: Run verification suite**
-
-Run: `cargo test -p host-core`  
-Run: `cargo fmt --all -- --check`
-
-**Step 2: Run client verification**
-
-Run: `./gradlew test`  
-Run: `npm test --workspace apps/host-ui`
-
-**Step 3: Document release commands**
-
-Add concrete build and release instructions for host and Android artifacts.
-
-**Step 4: Final status check**
-
-Ensure all tests pass and instructions are reproducible.
+## 任务 1：工程骨架与目录规范
+
+**文件：**
+- 新建/调整：`client/`、`client/host-core/`、`app/`
+- 修改：`Cargo.toml`、`README.md`
+
+**步骤：**
+1. 明确目录规范并建立基础结构。  
+2. 运行 `cargo test -p host-core` 验证主机核心可编译。  
+3. 运行 `npm test`（在 `client`）验证 UI 工程可运行。
+
+## 任务 2：主机核心锁档配置
+
+**文件：**
+- `client/host-core/src/config/profile.rs`
+- `client/host-core/tests/profile_test.rs`
+
+**步骤：**
+1. 先写失败测试（非法帧率、非法分辨率、无效码率）。  
+2. 实现最小配置模型并校验通过。  
+3. 运行 `cargo test -p host-core --test profile_test`。
+
+## 任务 3：控制协议与校验
+
+**文件：**
+- `shared/proto/control.proto`
+- `client/host-core/src/protocol/control.rs`
+- `client/host-core/tests/protocol_test.rs`
+
+**步骤：**
+1. 先写失败测试（空负载、越界坐标、序列化回环）。  
+2. 完成协议模型、编解码与边界校验。  
+3. 运行 `cargo test -p host-core --test protocol_test`。
+
+## 任务 4：MuMu 触控桥接
+
+**文件：**
+- `client/host-core/src/input/mumu/adb.rs`
+- `client/host-core/src/input/mumu/minitouch.rs`
+- `client/host-core/src/input/mumu/bridge.rs`
+- `client/host-core/tests/mumu_test.rs`
+
+**步骤：**
+1. 先写失败测试（ADB 解析、候选设备选择、payload 编码）。  
+2. 完成 MuMu 设备发现与 minitouch 指令转换。  
+3. 运行 `cargo test -p host-core --test mumu_test`。
+
+## 任务 5：映射与会话编排
+
+**文件：**
+- `client/host-core/src/input/mapping.rs`
+- `client/host-core/src/session.rs`
+- `client/host-core/tests/mapping_test.rs`
+- `client/host-core/tests/session_test.rs`
+
+**步骤：**
+1. 先写失败测试（黑边区域、状态切换、失败回滚）。  
+2. 实现映射逻辑与会话状态机。  
+3. 运行 `cargo test -p host-core --test mapping_test` 与 `cargo test -p host-core --test session_test`。
+
+## 任务 6：桌面端 Tauri 控制台
+
+**文件：**
+- `client/src/pages/Session.tsx`
+- `client/src/main.tsx`
+- `client/src/lib/api.ts`
+- `client/src-tauri/src/main.rs`
+- `client/src/pages/Session.test.tsx`
+
+**步骤：**
+1. 先写失败测试（参数提交、停止按钮状态）。  
+2. 实现启动/停止/状态查询三条命令链路。  
+3. 运行 `npm test`、`npm run build`、`cargo check`（`client/src-tauri`）。
+
+## 任务 7：安卓端基础工程
+
+**文件：**
+- `app/app/src/main/java/com/linkmycomputer/player/TouchTracker.kt`
+- `app/app/src/main/java/com/linkmycomputer/player/TouchOverlayView.kt`
+- `app/app/src/main/java/com/linkmycomputer/player/PlayerActivity.kt`
+- `app/app/src/test/java/com/linkmycomputer/player/TouchTrackerTest.kt`
+
+**步骤：**
+1. 先写失败测试（pointer 生命周期与范围裁剪）。  
+2. 实现触控跟踪和视图事件分发。  
+3. 运行 `gradle -p app test`。
+
+## 任务 8：GitHub 自动打包
+
+**文件：**
+- `.github/workflows/release-host.yml`
+- `.github/workflows/release-android.yml`
+
+**步骤：**
+1. 桌面端工作流覆盖：Rust 测试、客户端测试、构建、产物上传。  
+2. 安卓工作流覆盖：单元测试、APK 构建、产物上传。  
+3. 手动触发工作流并确认产物可下载。
+
+## 任务 9：最终验收
+
+**步骤：**
+1. `cargo test -p host-core`  
+2. `cargo fmt --all -- --check`  
+3. `npm test`（`client`）  
+4. `npm run build`（`client`）  
+5. `cargo check`（`client/src-tauri`）
+
+通过后发布到 GitHub 主分支并触发打包工作流。

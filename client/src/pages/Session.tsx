@@ -15,10 +15,10 @@ const FPS_VALUES = [60, 90, 120, 144] as const;
 const RESOLUTION_VALUES = ["1280x720", "1600x900", "1920x1080", "2460x1080"] as const;
 
 const STATUS_LABEL: Record<UiSessionStatus, string> = {
-  idle: "Idle",
-  starting: "Starting",
-  running: "Running",
-  error: "Error"
+  idle: "空闲",
+  starting: "启动中",
+  running: "运行中",
+  error: "错误"
 };
 
 export function SessionPage({
@@ -33,7 +33,7 @@ export function SessionPage({
   const [bitrateKbps, setBitrateKbps] = useState<number>(80000);
 
   const profileSummary = useMemo(() => {
-    return `${resolution} @ ${fps}Hz · ${bitrateKbps.toLocaleString()} kbps · turbo_lock`;
+    return `${resolution} @ ${fps}Hz · ${bitrateKbps.toLocaleString()} kbps · 极速锁定`;
   }, [bitrateKbps, fps, resolution]);
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -50,24 +50,24 @@ export function SessionPage({
     <main className="host-shell">
       <section className="host-panel">
         <header className="host-panel__header">
-          <p className="host-eyebrow">LinkMyComputer Host</p>
-          <h1>MuMu Turbo Lock Console</h1>
+          <p className="host-eyebrow">LinkMyComputer 桌面端</p>
+          <h1>MuMu 极速锁定控制台</h1>
           <p className="host-subtitle">
-            Desktop Rust host with fixed high-refresh streaming and low-latency touch bridge.
+            Rust 主机核心 + 低延迟触控桥接，支持局域网固定高刷配置。
           </p>
         </header>
 
         <div className="status-row" role="status" aria-live="polite">
           <span className={`status-dot status-dot--${status}`} aria-hidden="true" />
           <strong>{STATUS_LABEL[status]}</strong>
-          <span className="status-message">{lastMessage ?? "Ready to launch session."}</span>
+          <span className="status-message">{lastMessage ?? "准备就绪，可随时启动会话。"}</span>
         </div>
 
         <form onSubmit={onSubmit} className="profile-grid">
-          <label htmlFor="fps">FPS</label>
+          <label htmlFor="fps">帧率 (FPS)</label>
           <select
             id="fps"
-            aria-label="FPS"
+            aria-label="帧率"
             value={fps}
             onChange={(event) => setFps(Number(event.target.value) as (typeof FPS_VALUES)[number])}
           >
@@ -78,10 +78,10 @@ export function SessionPage({
             ))}
           </select>
 
-          <label htmlFor="resolution">Resolution</label>
+          <label htmlFor="resolution">分辨率</label>
           <select
             id="resolution"
-            aria-label="Resolution"
+            aria-label="分辨率"
             value={resolution}
             onChange={(event) =>
               setResolution(event.target.value as (typeof RESOLUTION_VALUES)[number])
@@ -94,10 +94,10 @@ export function SessionPage({
             ))}
           </select>
 
-          <label htmlFor="bitrate">Bitrate</label>
+          <label htmlFor="bitrate">码率 (kbps)</label>
           <input
             id="bitrate"
-            aria-label="Bitrate"
+            aria-label="码率"
             type="number"
             min={1000}
             step={1000}
@@ -109,7 +109,7 @@ export function SessionPage({
 
           <div className="actions-row">
             <button type="submit" disabled={status === "starting"}>
-              {status === "starting" ? "Starting..." : "Start Locked Session"}
+              {status === "starting" ? "启动中..." : "启动锁定会话"}
             </button>
             <button
               type="button"
@@ -119,7 +119,7 @@ export function SessionPage({
               }}
               disabled={status !== "running"}
             >
-              Stop Session
+              停止会话
             </button>
           </div>
         </form>
