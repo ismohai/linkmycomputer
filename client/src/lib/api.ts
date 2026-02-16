@@ -1,0 +1,42 @@
+import { invoke } from "@tauri-apps/api/core";
+
+export type LockPolicy = "turbo_lock";
+
+export type SessionPayload = {
+  fps: 60 | 90 | 120 | 144;
+  resolution: "1280x720" | "1600x900" | "1920x1080" | "2460x1080";
+  bitrateKbps: number;
+  lockPolicy: LockPolicy;
+};
+
+export type SessionState = "idle" | "starting" | "running";
+
+export type SessionStatusResponse = {
+  state: SessionState;
+};
+
+export async function startLockedSession(payload: SessionPayload): Promise<SessionPayload> {
+  if (hasTauriRuntime()) {
+    return invoke<SessionPayload>("start_locked_session", { payload });
+  }
+
+  return payload;
+}
+
+export async function stopSession(): Promise<void> {
+  if (hasTauriRuntime()) {
+    await invoke("stop_session");
+  }
+}
+
+export async function getSessionStatus(): Promise<SessionStatusResponse> {
+  if (hasTauriRuntime()) {
+    return invoke<SessionStatusResponse>("session_status");
+  }
+
+  return { state: "idle" };
+}
+
+function hasTauriRuntime(): boolean {
+  return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+}

@@ -1,0 +1,56 @@
+name: release-host
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+jobs:
+  build-windows-host:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run host-core tests
+        run: cargo test -p host-core
+
+      - name: Build host-core release binary
+        run: cargo build -p host-core --release
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install host-ui deps
+        working-directory: client
+        run: npm ci
+
+      - name: Run host-ui tests
+        working-directory: client
+        run: npm test
+
+      - name: Build host-ui frontend
+        working-directory: client
+        run: npm run build
+
+      - name: Check tauri backend
+        working-directory: client/src-tauri
+        run: cargo check
+
+      - name: Archive host artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: host-core-artifacts
+          path: |
+            target/release/host-core.exe
+            client/dist

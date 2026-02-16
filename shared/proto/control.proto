@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package linkmycomputer.control;
+
+enum PointerAction {
+  POINTER_ACTION_UNSPECIFIED = 0;
+  POINTER_ACTION_DOWN = 1;
+  POINTER_ACTION_MOVE = 2;
+  POINTER_ACTION_UP = 3;
+  POINTER_ACTION_CANCEL = 4;
+}
+
+message PointerEvent {
+  uint32 pointer_id = 1;
+  PointerAction action = 2;
+  float x = 3;
+  float y = 4;
+  float pressure = 5;
+  uint64 timestamp_ms = 6;
+}
+
+message TouchEnvelope {
+  uint64 frame_id = 1;
+  repeated PointerEvent events = 2;
+}
+
+message Ping {
+  uint64 timestamp_ms = 1;
+}
+
+message ControlFrame {
+  oneof payload {
+    TouchEnvelope touch = 1;
+    Ping ping = 2;
+  }
+}

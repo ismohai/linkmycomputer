@@ -1,0 +1,13 @@
+/target/
+/.idea/
+/.vscode/
+*.log
+*.tmp
+/.gradle/
+/app/.gradle/
+/app/local.properties
+/app/app/build/
+/client/node_modules/
+/client/dist/
+/client/src-tauri/target/
+/AIlog/
