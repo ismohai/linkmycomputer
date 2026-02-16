@@ -1,12 +1,22 @@
 import { FormEvent, useMemo, useState } from "react";
 
-import { SessionPayload } from "../lib/api";
+import { LanDevice, SessionPayload } from "../lib/api";
 
 export type UiSessionStatus = "idle" | "starting" | "running" | "error";
 
 type Props = {
   status: UiSessionStatus;
   lastMessage?: string;
+  devices: LanDevice[];
+  scanning: boolean;
+  connection: {
+    connected: boolean;
+    message: string;
+    device?: LanDevice;
+  };
+  onScanDevices: () => Promise<void> | void;
+  onConnectDevice: (device: LanDevice) => Promise<void> | void;
+  onDisconnectDevice: () => Promise<void> | void;
   onStartSession: (payload: SessionPayload) => Promise<void> | void;
   onStopSession: () => Promise<void> | void;
 };
@@ -24,6 +34,12 @@ const STATUS_LABEL: Record<UiSessionStatus, string> = {
 export function SessionPage({
   status,
   lastMessage,
+  devices,
+  scanning,
+  connection,
+  onScanDevices,
+  onConnectDevice,
+  onDisconnectDevice,
   onStartSession,
   onStopSession
 }: Props) {
@@ -62,6 +78,68 @@ export function SessionPage({
           <strong>{STATUS_LABEL[status]}</strong>
           <span className="status-message">{lastMessage ?? "准备就绪，可随时启动会话。"}</span>
         </div>
+
+        <section className="connect-panel">
+          <div className="connect-panel__header">
+            <h2>手机连接</h2>
+            <button
+              type="button"
+              className="ghost"
+              onClick={() => {
+                void onScanDevices();
+              }}
+              disabled={scanning}
+            >
+              {scanning ? "扫描中..." : "扫描局域网设备"}
+            </button>
+          </div>
+
+          <p className="connect-hint">{connection.message}</p>
+
+          {connection.connected && connection.device ? (
+            <div className="connected-card">
+              <strong>已连接：{connection.device.name}</strong>
+              <span>
+                {connection.device.ip}:{connection.device.controlPort}
+              </span>
+              <button
+                type="button"
+                className="ghost"
+                onClick={() => {
+                  void onDisconnectDevice();
+                }}
+              >
+                断开手机连接
+              </button>
+            </div>
+          ) : null}
+
+          <ul className="device-list">
+            {devices.map((device) => (
+              <li key={device.id} className="device-item">
+                <div>
+                  <strong>{device.name}</strong>
+                  <p>
+                    {device.ip}:{device.controlPort} · 协议 {device.version}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void onConnectDevice(device);
+                  }}
+                  disabled={connection.connected}
+                >
+                  发起连接
+                </button>
+              </li>
+            ))}
+          </ul>
+
+          {devices.length === 0 ? (
+            <p className="empty-device">未发现手机。请确保手机与电脑在同一局域网，且手机 App 已打开。</p>
+          ) : null}
+        </section>
 
         <form onSubmit={onSubmit} className="profile-grid">
           <label htmlFor="fps">帧率 (FPS)</label>

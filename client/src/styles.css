@@ -107,6 +107,75 @@ body {
   color: var(--text-muted);
 }
 
+.connect-panel {
+  margin-top: 18px;
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  padding: 14px;
+  background: #fff;
+}
+
+.connect-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.connect-panel__header h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.connect-hint {
+  margin: 10px 0;
+  color: var(--text-muted);
+  font-size: 0.92rem;
+}
+
+.connected-card {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  border: 1px solid #b7d8ca;
+  background: #edf9f2;
+  border-radius: 10px;
+  padding: 10px;
+  margin-bottom: 10px;
+}
+
+.device-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.device-item {
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  padding: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: #fffdfa;
+}
+
+.device-item p {
+  margin: 6px 0 0;
+  color: var(--text-muted);
+  font-size: 0.86rem;
+}
+
+.empty-device {
+  margin: 10px 0 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
 .profile-grid {
   display: grid;
   grid-template-columns: 1fr;
