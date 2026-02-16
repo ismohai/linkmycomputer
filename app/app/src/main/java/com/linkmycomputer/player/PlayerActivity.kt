@@ -6,6 +6,7 @@ import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.widget.Button
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
@@ -14,6 +15,8 @@ import androidx.appcompat.app.AppCompatActivity
 class PlayerActivity : AppCompatActivity() {
     private lateinit var statusText: TextView
     private lateinit var connectionText: TextView
+    private lateinit var controlHintText: TextView
+    private lateinit var touchSurface: TouchOverlayView
     private lateinit var disconnectButton: Button
     private lateinit var lanServer: LanControlServer
 
@@ -41,6 +44,10 @@ class PlayerActivity : AppCompatActivity() {
 
         disconnectButton.setOnClickListener {
             lanServer.disconnectFromDesktop()
+        }
+
+        touchSurface.onTouchFrame = { frame ->
+            lanServer.sendTouchFrame(frame)
         }
 
         lanServer.start()
@@ -86,7 +93,37 @@ class PlayerActivity : AppCompatActivity() {
             text = "连接：未连接电脑"
             setTextColor(Color.parseColor("#384242"))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
-            setPadding(0, 0, 0, dp(18))
+            setPadding(0, 0, 0, dp(8))
+        }
+
+        controlHintText = TextView(this).apply {
+            text = "控制区：连接成功后可在下方触控区操作模拟器"
+            setTextColor(Color.parseColor("#5A6464"))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+            setPadding(0, 0, 0, dp(12))
+        }
+
+        touchSurface = TouchOverlayView(this).apply {
+            setBackgroundColor(Color.parseColor("#222B38"))
+            visibility = View.GONE
+            isEnabled = false
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                0,
+                1f
+            )
+        }
+
+        val touchContainer = FrameLayout(this).apply {
+            setBackgroundColor(Color.parseColor("#1C2430"))
+            val params = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                0,
+                1f
+            )
+            layoutParams = params
+            setPadding(dp(2), dp(2), dp(2), dp(2))
+            addView(touchSurface)
         }
 
         disconnectButton = Button(this).apply {
@@ -98,7 +135,9 @@ class PlayerActivity : AppCompatActivity() {
         root.addView(subtitle)
         root.addView(statusText)
         root.addView(connectionText)
+        root.addView(controlHintText)
         root.addView(disconnectButton)
+        root.addView(touchContainer)
 
         return root
     }
@@ -120,10 +159,16 @@ class PlayerActivity : AppCompatActivity() {
     private fun updateConnectionState(state: LanConnectionState) {
         if (state.connected) {
             connectionText.text = "连接：已连接 ${state.desktopName ?: "未知电脑"}（${state.hostAddress ?: "未知地址"}）"
+            controlHintText.text = "控制区：已连接，直接在下方触控区点击/滑动即可控制"
             disconnectButton.isEnabled = true
+            touchSurface.visibility = View.VISIBLE
+            touchSurface.isEnabled = true
         } else {
             connectionText.text = "连接：未连接电脑"
+            controlHintText.text = "控制区：连接成功后可在下方触控区操作模拟器"
             disconnectButton.isEnabled = false
+            touchSurface.visibility = View.GONE
+            touchSurface.isEnabled = false
         }
     }
 

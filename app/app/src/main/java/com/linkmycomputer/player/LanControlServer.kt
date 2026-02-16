@@ -6,12 +6,14 @@ import java.net.DatagramSocket
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.SocketException
+import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
 
 data class ConnectRequest(
     val desktopName: String,
     val hostAddress: String,
-    val hostPort: Int
+    val hostPort: Int,
+    val hostTouchPort: Int
 )
 
 data class LanConnectionState(
@@ -33,6 +35,9 @@ class LanControlServer(
 
     @Volatile
     private var connectedEndpoint: InetSocketAddress? = null
+
+    @Volatile
+    private var connectedTouchEndpoint: InetSocketAddress? = null
 
     @Volatile
     private var connectedDesktopName: String? = null
@@ -63,6 +68,7 @@ class LanControlServer(
         discoveryThread = null
         controlThread = null
         connectedEndpoint = null
+        connectedTouchEndpoint = null
         connectedDesktopName = null
         onConnectionChanged(LanConnectionState(connected = false))
     }
@@ -70,9 +76,29 @@ class LanControlServer(
     fun disconnectFromDesktop() {
         notifyDesktop("LMC_DISCONNECTED|PHONE_MANUAL")
         connectedEndpoint = null
+        connectedTouchEndpoint = null
         connectedDesktopName = null
         onConnectionChanged(LanConnectionState(connected = false))
         onStatus("已从手机端主动断开连接。")
+    }
+
+    fun sendTouchFrame(frame: TouchFrame) {
+        val endpoint = connectedTouchEndpoint ?: return
+
+        frame.events.forEach { event ->
+            val packet = String.format(
+                Locale.US,
+                "LMC_TOUCH|%d|%d|%s|%.5f|%.5f|%.4f|%d",
+                frame.frameId,
+                event.pointerId,
+                event.action.name,
+                event.x,
+                event.y,
+                event.pressure,
+                event.timestampMs
+            )
+            sendPacket(packet, endpoint.address, endpoint.port)
+        }
     }
 
     private fun startDiscoveryLoop() {
@@ -148,16 +174,20 @@ class LanControlServer(
     private fun handleControlMessage(message: String, address: InetAddress, port: Int) {
         when {
             message.startsWith("LMC_CONNECT_REQUEST|") -> {
-                val desktopName = message.split("|").getOrNull(1)?.ifBlank { "未知电脑" } ?: "未知电脑"
+                val parts = message.split("|")
+                val desktopName = parts.getOrNull(1)?.ifBlank { "未知电脑" } ?: "未知电脑"
+                val hostTouchPort = parts.getOrNull(2)?.toIntOrNull() ?: DEFAULT_HOST_TOUCH_PORT
                 val request = ConnectRequest(
                     desktopName = desktopName,
                     hostAddress = address.hostAddress ?: "未知地址",
-                    hostPort = port
+                    hostPort = port,
+                    hostTouchPort = hostTouchPort
                 )
 
                 onConnectRequest(request) { accepted ->
                     if (accepted) {
                         connectedEndpoint = InetSocketAddress(address, port)
+                        connectedTouchEndpoint = InetSocketAddress(address, hostTouchPort)
                         connectedDesktopName = desktopName
                         sendPacket("LMC_CONNECT_ACCEPT|${Build.MODEL}", address, port)
                         onConnectionChanged(
@@ -177,6 +207,7 @@ class LanControlServer(
 
             message.startsWith("LMC_DISCONNECT") -> {
                 connectedEndpoint = null
+                connectedTouchEndpoint = null
                 connectedDesktopName = null
                 onConnectionChanged(LanConnectionState(connected = false))
                 onStatus("电脑端已断开连接。")
@@ -212,6 +243,7 @@ class LanControlServer(
     companion object {
         const val DISCOVERY_PORT = 42042
         const val CONTROL_PORT = 42043
+        private const val DEFAULT_HOST_TOUCH_PORT = 42044
         private const val SOCKET_TIMEOUT_MS = 700
         private const val APP_VERSION = "0.1.0"
     }
