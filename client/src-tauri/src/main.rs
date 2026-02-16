@@ -1,5 +1,6 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::net::{SocketAddr, UdpSocket};
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -63,6 +64,7 @@ enum SessionStateValue {
 struct TouchRuntime {
     connected_device_ip: Option<String>,
     mumu_serial: Option<String>,
+    adb_path: Option<String>,
     down_points: HashMap<u8, (u32, u32)>,
     last_points: HashMap<u8, (u32, u32)>,
     target_width: u32,
@@ -74,6 +76,7 @@ impl Default for TouchRuntime {
         Self {
             connected_device_ip: None,
             mumu_serial: None,
+            adb_path: None,
             down_points: HashMap::new(),
             last_points: HashMap::new(),
             target_width: 2460,
@@ -246,14 +249,18 @@ fn request_device_connection(
 
     let message = format!("LMC_CONNECT_REQUEST|{}|{}", desktop_name(), HOST_TOUCH_PORT);
     let target = format!("{}:{}", device.ip, device.control_port);
-    socket
-        .send_to(message.as_bytes(), &target)
-        .map_err(|err| format!("发送连接请求失败: {err}"))?;
-
     let begin = Instant::now();
+    let mut last_send = Instant::now() - Duration::from_millis(600);
     let mut buffer = [0_u8; 1024];
 
     while begin.elapsed() < Duration::from_millis(REQUEST_TIMEOUT_MS) {
+        if last_send.elapsed() >= Duration::from_millis(500) {
+            socket
+                .send_to(message.as_bytes(), &target)
+                .map_err(|err| format!("发送连接请求失败: {err}"))?;
+            last_send = Instant::now();
+        }
+
         match socket.recv_from(&mut buffer) {
             Ok((length, from)) => {
                 if from.ip().to_string() != device.ip {
@@ -282,7 +289,9 @@ fn request_device_connection(
                     runtime.last_points.clear();
 
                     let bridge_status = match ensure_mumu_serial(&mut runtime) {
-                        Ok(serial) => format!("手机已确认连接，可直接控制（MuMu: {serial}）"),
+                        Ok((adb_path, serial)) => {
+                            format!("手机已确认连接，可直接控制（MuMu: {serial}，ADB: {adb_path}）")
+                        }
                         Err(err) => {
                             format!("手机已确认连接，但MuMu控制通道未就绪：{err}")
                         }
@@ -509,7 +518,7 @@ fn handle_touch_datagram(runtime: &Arc<Mutex<TouchRuntime>>, from: SocketAddr, p
         None => return,
     };
 
-    let (serial, command) = {
+    let (adb_path, serial, command) = {
         let mut guard = match runtime.lock() {
             Ok(guard) => guard,
             Err(_) => return,
@@ -520,17 +529,17 @@ fn handle_touch_datagram(runtime: &Arc<Mutex<TouchRuntime>>, from: SocketAddr, p
             return;
         }
 
-        let serial = match ensure_mumu_serial(&mut guard) {
-            Ok(serial) => serial,
+        let (adb_path, serial) = match ensure_mumu_serial(&mut guard) {
+            Ok(route) => route,
             Err(_) => return,
         };
 
         let command = plan_touch_command(&mut guard, &event);
-        (serial, command)
+        (adb_path, serial, command)
     };
 
     if let Some(command) = command {
-        let _ = execute_adb_touch(&serial, command);
+        let _ = execute_adb_touch(&adb_path, &serial, command);
     }
 }
 
@@ -558,23 +567,49 @@ fn parse_touch_packet(payload: &str) -> Option<TouchEventPacket> {
     })
 }
 
-fn ensure_mumu_serial(runtime: &mut TouchRuntime) -> Result<String, String> {
-    if let Some(serial) = runtime.mumu_serial.clone() {
-        return Ok(serial);
+fn ensure_mumu_serial(runtime: &mut TouchRuntime) -> Result<(String, String), String> {
+    if let (Some(adb_path), Some(serial)) = (runtime.adb_path.clone(), runtime.mumu_serial.clone())
+    {
+        return Ok((adb_path, serial));
     }
 
     let bridge = MumuBridge::new(runtime.target_width.max(1), runtime.target_height.max(1));
-    let serial = bridge
-        .discover_serial_via_adb("adb")
-        .map_err(|err| format!("无法找到 MuMu 设备: {err}"))?;
-    runtime.mumu_serial = Some(serial.clone());
-    Ok(serial)
+    let candidates = resolve_adb_candidates(runtime.adb_path.as_deref());
+    let mut errors = Vec::new();
+
+    for adb_path in candidates {
+        match bridge.discover_serial_via_adb(&adb_path) {
+            Ok(serial) => {
+                runtime.adb_path = Some(adb_path.clone());
+                runtime.mumu_serial = Some(serial.clone());
+                return Ok((adb_path, serial));
+            }
+            Err(err) => {
+                errors.push(format!("{} => {}", adb_path, err));
+            }
+        }
+    }
+
+    let hint = if errors.is_empty() {
+        "没有可用的 adb 路径。".to_string()
+    } else {
+        let detail = errors
+            .iter()
+            .take(3)
+            .cloned()
+            .collect::<Vec<_>>()
+            .join("；");
+        format!("已尝试路径失败：{}", detail)
+    };
+
+    Err(format!("无法找到 MuMu 设备，请检查 adb。{}", hint))
 }
 
 fn plan_touch_command(
     runtime: &mut TouchRuntime,
     event: &TouchEventPacket,
 ) -> Option<AdbTouchCommand> {
+    let _ = event.pressure;
     if event.pointer_id != 0 {
         return None;
     }
@@ -629,8 +664,8 @@ fn to_pixel(normalized: f32, max: u32) -> u32 {
     value.round() as u32
 }
 
-fn execute_adb_touch(serial: &str, command: AdbTouchCommand) -> Result<(), String> {
-    let mut process = Command::new("adb");
+fn execute_adb_touch(adb_path: &str, serial: &str, command: AdbTouchCommand) -> Result<(), String> {
+    let mut process = Command::new(adb_path);
     process.arg("-s").arg(serial).arg("shell").arg("input");
 
     match command {
@@ -656,7 +691,7 @@ fn execute_adb_touch(serial: &str, command: AdbTouchCommand) -> Result<(), Strin
 
     let output = process
         .output()
-        .map_err(|err| format!("执行 adb 触控失败: {err}"))?;
+        .map_err(|err| format!("执行 adb 触控失败（{}）: {err}", adb_path))?;
 
     if output.status.success() {
         return Ok(());
@@ -667,6 +702,115 @@ fn execute_adb_touch(serial: &str, command: AdbTouchCommand) -> Result<(), Strin
         return Err("adb 触控命令执行失败（无错误输出）".to_string());
     }
     Err(format!("adb 触控命令执行失败: {stderr}"))
+}
+
+fn resolve_adb_candidates(current: Option<&str>) -> Vec<String> {
+    let mut candidates = Vec::<String>::new();
+    let mut seen = HashSet::<String>::new();
+
+    if let Some(path) = current {
+        push_unique_candidate(&mut candidates, &mut seen, path);
+    }
+
+    if let Ok(path) = std::env::var("LMC_ADB_PATH") {
+        push_unique_candidate(&mut candidates, &mut seen, &path);
+    }
+
+    push_unique_candidate(&mut candidates, &mut seen, "adb");
+
+    for path in where_adb_paths() {
+        push_unique_candidate(&mut candidates, &mut seen, &path);
+    }
+
+    let fixed = [
+        r"C:\Program Files\Netease\MuMuPlayerGlobal-12.0\shell\adb.exe",
+        r"C:\Program Files\Netease\MuMuPlayer-12.0\shell\adb.exe",
+        r"C:\Program Files\Netease\MuMuPlayerGlobal\shell\adb.exe",
+        r"C:\Program Files\Netease\MuMuPlayer\shell\adb.exe",
+        r"C:\Program Files (x86)\Netease\MuMuPlayerGlobal-12.0\shell\adb.exe",
+        r"C:\Program Files (x86)\Netease\MuMuPlayer-12.0\shell\adb.exe",
+    ];
+
+    for path in fixed {
+        if Path::new(path).exists() {
+            push_unique_candidate(&mut candidates, &mut seen, path);
+        }
+    }
+
+    for key in ["ProgramFiles", "ProgramFiles(x86)"] {
+        if let Ok(root) = std::env::var(key) {
+            let netease = PathBuf::from(root).join("Netease");
+            if netease.exists() {
+                collect_adb_under(&netease, 0, &mut candidates, &mut seen);
+            }
+        }
+    }
+
+    candidates
+}
+
+fn push_unique_candidate(candidates: &mut Vec<String>, seen: &mut HashSet<String>, value: &str) {
+    let normalized = value.trim().trim_matches('"').to_string();
+    if normalized.is_empty() {
+        return;
+    }
+
+    let key = normalized.to_lowercase();
+    if seen.insert(key) {
+        candidates.push(normalized);
+    }
+}
+
+fn where_adb_paths() -> Vec<String> {
+    let output = match Command::new("cmd").args(["/C", "where adb"]).output() {
+        Ok(output) => output,
+        Err(_) => return Vec::new(),
+    };
+
+    if !output.status.success() {
+        return Vec::new();
+    }
+
+    String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .map(|line| line.trim().to_string())
+        .filter(|line| !line.is_empty())
+        .collect()
+}
+
+fn collect_adb_under(dir: &Path, depth: usize, out: &mut Vec<String>, seen: &mut HashSet<String>) {
+    if depth > 6 {
+        return;
+    }
+
+    let entries = match std::fs::read_dir(dir) {
+        Ok(entries) => entries,
+        Err(_) => return,
+    };
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            collect_adb_under(&path, depth + 1, out, seen);
+            continue;
+        }
+
+        let is_adb = path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .map(|name| name.eq_ignore_ascii_case("adb.exe"))
+            .unwrap_or(false);
+
+        if !is_adb {
+            continue;
+        }
+
+        let text = path.to_string_lossy().to_string();
+        let key = text.to_lowercase();
+        if seen.insert(key) {
+            out.push(text);
+        }
+    }
 }
 
 fn main() {
