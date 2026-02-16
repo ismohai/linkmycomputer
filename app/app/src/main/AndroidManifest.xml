@@ -9,7 +9,7 @@
         android:theme="@style/Theme.LinkMyComputer"
         android:supportsRtl="true">
         <activity
-            android:name=".player.PlayerActivity"
+            android:name=".PlayerActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
