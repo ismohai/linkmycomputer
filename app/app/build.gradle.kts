@@ -7,6 +7,20 @@ android {
     namespace = "com.linkmycomputer.player"
     compileSdk = 34
 
+    signingConfigs {
+        create("release") {
+            val storePath = System.getenv("ANDROID_SIGNING_STORE_FILE")
+            if (!storePath.isNullOrBlank()) {
+                storeFile = file(storePath)
+                storePassword = System.getenv("ANDROID_SIGNING_STORE_PASSWORD")
+                keyAlias = System.getenv("ANDROID_SIGNING_KEY_ALIAS")
+                keyPassword = System.getenv("ANDROID_SIGNING_KEY_PASSWORD")
+            } else {
+                initWith(getByName("debug"))
+            }
+        }
+    }
+
     defaultConfig {
         applicationId = "com.linkmycomputer.player"
         minSdk = 26
@@ -20,6 +34,7 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
